@@ -51,16 +51,11 @@ exports.reduceUserDetails = (data) => {
   let userDetails = {};
 
   // mandatory details
-  let { fullName, phoneNo, address, postcode, city, state } = data;
+  let { fullName, address, postcode, city, state } = data;
 
   // validate full name
   if (isEmpty(fullName)) errors.fullName = "Must not be empty";
   else if (!isFullName(fullName)) errors.fullName = "Must be a valid full name";
-
-  // validate & reduce phone number
-  if (isEmpty(phoneNo)) errors.phoneNo = "Must not be empty";
-  else if (!isPhoneNo(phoneNo)) errors.phoneNo = "Must be a valid phone number";
-  else phoneNo = phoneNo.match(/\d/g).join("");
 
   // validate location
   if (isEmpty(address)) errors.address = "Must not be empty";
@@ -72,9 +67,6 @@ exports.reduceUserDetails = (data) => {
 
   // if user filled up all the details needed
   userDetails.fullName = fullName;
-  userDetails.contact = {};
-  userDetails.contact.phoneNo = phoneNo;
-  userDetails.contact.whatsappEnabled = data.whatsappEnabled;
   userDetails.location = {
     address,
     postcode,
@@ -83,8 +75,20 @@ exports.reduceUserDetails = (data) => {
   };
 
   // additional details
-  let { facebook, instagram, bio } = data;
-  userDetails.contact.socialMedia;
+  let { phoneNo, whatsappEnabled, facebook, instagram, bio } = data;
+  userDetails.contact = {};
+  // validate & reduce phone number
+  if (phoneNo && !isEmpty(phoneNo)) {
+    if (!isPhoneNo(phoneNo)) errors.phoneNo = "Must be a valid phone number";
+    else {
+      phoneNo = phoneNo.match(/\d/g).join("");
+      if (phoneNo.charAt(0) !== "6") phoneNo = "6" + phoneNo;
+    }
+
+    userDetails.contact.phoneNo = phoneNo;
+    userDetails.contact.whatsappEnabled = whatsappEnabled;
+  }
+
   if (facebook && !isEmpty(facebook)) {
     if (facebook.includes("facebook.com")) {
       facebook = facebook.match(/facebook\.com\/([^/]*?)\/?$/)[1];
@@ -112,7 +116,7 @@ exports.validatePost = (postInfo) => {
   if (isEmpty(description)) errors.description = "Must not be empty";
   if (isEmpty(image)) errors.image = "Must not be empty";
   if (isEmpty(price)) errors.price = "Must not be empty";
-  else if (isNaN(price)) "Must be a valid price";
+  else if (isNaN(price)) errors.price = "Must be a valid price";
 
   return { errors, valid: Object.keys(errors).length === 0 };
 };

@@ -10,46 +10,82 @@ const { validatePost } = require("../util/validators");
 // fetch based on category
 // fetch based on price
 // https://stackoverflow.com/questions/48036975/firestore-multiple-conditional-where-clauses (this may help)
+
+const mismatchAddress = (keyword, itemLocation) =>
+  !itemLocation.address.toLowerCase().includes(keyword);
+
+const mismatchPostcode = (keyword, itemLocation) =>
+  !itemLocation.postcode.toLowerCase().includes(keyword);
+
+const mismatchCity = (keyword, itemLocation) =>
+  !itemLocation.city.toLowerCase().includes(keyword);
+
+const mismatchState = (keyword, itemLocation) =>
+  !itemLocation.state.toLowerCase().includes(keyword);
+
 exports.getAllPosts = (req, res) => {
   let postRef = db.collection("posts").where("isAvailable", "==", true);
   if (req.query.hideOwnPosts === "true")
     postRef = postRef.where("userHandle", "!=", req.user.handle);
 
-  // if (req.query.search) {
-  //   // user searched
-  //   const searchText = decodeURIComponent(req.query.search);
+  let searchText = "";
+  if (req.query.search)
+    searchText = decodeURIComponent(req.query.search).toLowerCase();
 
-  //   postRef = postRef
-  //     .where("item.name", ">=", searchText)
-  //     .where("item.name", "<=", searchText + "~"); // '\uf8ff' equals '~'
-  // }
+  let categoriesArr;
+  if (req.query.categories) categoriesArr = req.query.categories;
+
+  let minPrice;
+  if (req.query.minPrice)
+    minPrice = Math.round(decodeURIComponent(req.query.minPrice) * 100) / 100;
+
+  let maxPrice;
+  if (req.query.maxPrice)
+    maxPrice = Math.round(decodeURIComponent(req.query.maxPrice) * 100) / 100;
+
+  let qAddress = req.query.address,
+    qPostcode = req.query.postcode,
+    qCity = req.query.city,
+    qState = req.query.state;
+  let locationGiven = qAddress || qPostcode || qCity || qState;
+  let mismatchLocation;
+  if (locationGiven) {
+    locationGiven = decodeURIComponent(locationGiven).toLowerCase();
+    if (qAddress) mismatchLocation = mismatchAddress;
+    else if (qPostcode) mismatchLocation = mismatchPostcode;
+    else if (qCity) mismatchLocation = mismatchCity;
+    else if (qState) mismatchLocation = mismatchState;
+  }
 
   postRef.get().then((data) => {
     let posts = [];
 
-    let searchText = "";
-    if (req.query.search) searchText = decodeURIComponent(req.query.search);
-
-    let categoriesArr;
-    if (req.query.categories)
-      categoriesArr = decodeURIComponent(req.query.categories).split(",");
-
     data.forEach((doc) => {
       // filter search
+
+      const { item } = doc.data();
+
       if (
         searchText &&
-        !doc.data().item.name.includes(searchText) &&
-        !doc.data().item.description.includes(searchText)
+        !item.name.toLowerCase().includes(searchText) &&
+        !item.description.toLowerCase().includes(searchText)
       )
         return;
 
       // filter categorize
       if (
         categoriesArr &&
-        !categoriesArr.every((category) =>
-          doc.data().item.categories.includes(category)
+        !categoriesArr.every(
+          (category) => item.categories && item.categories.includes(category)
         )
       )
+        return;
+
+      // filter price
+      if (minPrice && item.price <= minPrice) return;
+      if (maxPrice && item.price >= maxPrice) return;
+
+      if (locationGiven && mismatchLocation(locationGiven, doc.data().location))
         return;
 
       posts.push({
@@ -62,7 +98,7 @@ exports.getAllPosts = (req, res) => {
     });
 
     // sort posts based on date
-    posts = posts.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+    posts = posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     return res.json(posts);
   });
@@ -78,7 +114,7 @@ exports.getPost = (req, res) => {
     .then((doc) => {
       if (!doc.exists) return res.status(404).json({ error: "Post not found" });
 
-      itemDetail = { ...doc.data() };
+      itemDetail = doc.data();
 
       return db.doc(`/users/${itemDetail.userHandle}`).get();
     })
@@ -97,7 +133,7 @@ exports.getPost = (req, res) => {
 };
 
 // Get own posts
-exports.getPosts = (req, res) => {
+exports.getMyPosts = (req, res) => {
   db.collection("posts")
     .where("userHandle", "==", req.user.handle)
     .orderBy("createdAt", "desc")
@@ -125,11 +161,11 @@ exports.getPosts = (req, res) => {
 // post an item
 exports.postAnItem = (req, res) => {
   let { valid, errors } = validatePost(req.body);
-
+  console.log(req.body);
   if (!valid) return res.status(400).json(errors);
 
   const newPost = {
-    item: req.body,
+    item: { ...req.body, price: Math.round(req.body.price * 100) / 100 },
     isAvailable: true,
     userHandle: req.user.handle, //got thru the middleware
     location: req.user.location,
@@ -146,6 +182,58 @@ exports.postAnItem = (req, res) => {
     .catch((err) => {
       res.status(500).json({ error: "something went wrong" });
       console.error(err);
+    });
+};
+
+// edit a post
+exports.editPost = (req, res) => {
+  let { valid, errors } = validatePost(req.body);
+
+  if (!valid) return res.status(400).json(errors);
+
+  const editedPost = {
+    item: req.body,
+  };
+
+  const document = db.doc(`/posts/${req.params.postId}`);
+
+  const updateDocument = () =>
+    document
+      .update(editedPost)
+      .then(() => {
+        return document.get();
+      })
+      .then((doc) => {
+        const resPost = doc.data();
+        resPost.postId = doc.id;
+        res.json(resPost);
+      })
+      .catch((err) => {
+        res.status(500).json({ error: "something went wrong" });
+        console.error(err);
+      });
+
+  document
+    .get()
+    .then((doc) => {
+      if (doc.data().item.image !== editedPost.item.image) {
+        // delete image in storage
+        const imageUrl = doc.data().item.image;
+        const imageName = imageUrl.match(/\/o\/(.*?)\?alt=media/)[1];
+
+        return admin
+          .storage()
+          .bucket(config.storageBucket)
+          .file(imageName)
+          .delete();
+      }
+    })
+    .then(() => {
+      updateDocument();
+    })
+    .catch(() => {
+      // probably image/object not found for deleting
+      updateDocument();
     });
 };
 
@@ -167,7 +255,11 @@ exports.deletePost = (req, res) => {
       const imageUrl = doc.data().item.image;
       const imageName = imageUrl.match(/\/o\/(.*?)\?alt=media/)[1];
 
-      admin.storage().bucket(config.storageBucket).file(imageName).delete();
+      return admin
+        .storage()
+        .bucket(config.storageBucket)
+        .file(imageName)
+        .delete();
     })
     .then(() => {
       return document.delete();
@@ -184,6 +276,7 @@ exports.deletePost = (req, res) => {
 // disable a post
 exports.disableItem = (req, res) => {
   const postDocument = db.collection("posts").doc(req.params.postId);
+  let postData;
 
   postDocument
     .get()
@@ -200,10 +293,13 @@ exports.disableItem = (req, res) => {
         return res.status(400).json({ error: "Post already disabled" });
       }
 
+      postData = doc.data();
+      postData.postId = doc.id;
+      postData.isAvailable = false;
       return postDocument.update({ isAvailable: false });
     })
     .then(() => {
-      return res.json({ message: "Post disabled" });
+      return res.json(postData);
     })
     .catch((err) => {
       console.error(err);
@@ -214,6 +310,7 @@ exports.disableItem = (req, res) => {
 // enable a post
 exports.enableItem = (req, res) => {
   const postDocument = db.collection("posts").doc(req.params.postId);
+  let postData;
 
   postDocument
     .get()
@@ -229,11 +326,13 @@ exports.enableItem = (req, res) => {
       if (doc.data().isAvailable) {
         return res.status(400).json({ error: "Post already enabled" });
       }
-
+      postData = doc.data();
+      postData.postId = doc.id;
+      postData.isAvailable = true;
       return postDocument.update({ isAvailable: true });
     })
     .then(() => {
-      return res.json({ message: "Post enabled" });
+      return res.json(postData);
     })
     .catch((err) => {
       console.error(err);
@@ -265,7 +364,7 @@ exports.uploadItemImage = (req, res) => {
     const imageExtension = filename.split(".")[filename.split(".").length - 1];
     //img.png => 2341241234123432.png
     imageFileName = `${Math.round(
-      Math.random() * 10000000000
+      Math.random() * 1000000000000
     )}.${imageExtension}`;
     const filepath = path.join(os.tmpdir(), imageFileName);
 
@@ -275,7 +374,7 @@ exports.uploadItemImage = (req, res) => {
 
   //after uploaded the file
   busboy.on("finish", () => {
-    let imgUrl;
+    let imgUri;
     admin
       .storage()
       .bucket(config.storageBucket)
@@ -285,14 +384,57 @@ exports.uploadItemImage = (req, res) => {
       })
       .then(() => {
         //without the 'alt=media' parameter the link is just gonna download the image instead of displaying it
-        imgUrl = `https://firebasestorage.googleapis.com/v0/b/${config.storageBucket}/o/${imageFileName}?alt=media`;
-        return res.json(imgUrl);
+        imgUri = `https://firebasestorage.googleapis.com/v0/b/${config.storageBucket}/o/${imageFileName}?alt=media`;
+        return res.json(imgUri);
       })
       .catch((err) => {
-        console.error(err);
-        return res.status(500).json({ error: err.code });
+        console.error(err.code);
+        return res.status(500).json({ image: "Please upload an image" });
       });
   });
 
   req.pipe(busboy); //rawBody is a property in every request object
+};
+
+// Get other user details
+exports.getUserDetails = (req, res) => {
+  let userData = {};
+
+  db.doc(`/users/${req.params.handle}`)
+    .get()
+    .then((doc) => {
+      if (!doc.exists) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      userData.user = doc.data();
+      // get the posts
+      return db
+        .collection("posts")
+        .where("userHandle", "==", req.params.handle)
+        .where("isAvailable", "==", true)
+        .orderBy("createdAt", "desc")
+        .get();
+    })
+    .then((data) => {
+      userData.posts = [];
+
+      data.forEach((doc) => {
+        userData.posts.push({
+          item: doc.data().item,
+          categories: doc.data().categories,
+          isAvailable: doc.data().isAvailable,
+          createdAt: doc.data().createdAt,
+          userHandle: doc.data().userHandle,
+          userImage: doc.data().userImage,
+          location: doc.data().location,
+          postId: doc.id,
+        });
+      });
+
+      return res.json(userData);
+    })
+    .catch((err) => {
+      console.error(err);
+      return res.status(500).json({ error: err.code });
+    });
 };

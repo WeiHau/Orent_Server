@@ -1,4 +1,3 @@
-const { O_DIRECT } = require("constants");
 const firebase = require("firebase");
 const admin = require("firebase-admin");
 
@@ -160,52 +159,8 @@ exports.getAuthenticatedUser = (req, res) => {
     });
 };
 
-// Get other user details
-exports.getUserDetails = (req, res) => {
-  let userData = {};
-
-  db.doc(`/users/${req.params.handle}`)
-    .get()
-    .then((doc) => {
-      if (!doc.exists) {
-        return res.status(404).json({ error: "User not found" });
-      }
-      userData.user = doc.data();
-      // get the posts
-      return db
-        .collection("posts")
-        .where("userHandle", "==", req.params.handle)
-        .where("isAvailable", "==", true)
-        .orderBy("createdAt", "desc")
-        .get();
-    })
-    .then((data) => {
-      userData.posts = [];
-
-      data.forEach((doc) => {
-        userData.posts.push({
-          item: doc.data().item,
-          categories: doc.data().categories,
-          isAvailable: doc.data().isAvailable,
-          createdAt: doc.data().createdAt,
-          userHandle: doc.data().userHandle,
-          userImage: doc.data().userImage,
-          location: doc.data().location,
-          postId: doc.id,
-        });
-      });
-
-      return res.json(userData);
-    })
-    .catch((err) => {
-      console.error(err);
-      return res.status(500).json({ error: err.code });
-    });
-};
-
 // Upload a profile image
 exports.uploadImage = (req, res) => {
-  //TODO: study this
   const BusBoy = require("busboy");
   const path = require("path");
   const os = require("os");
@@ -217,7 +172,6 @@ exports.uploadImage = (req, res) => {
   let imageToBeUploaded = {};
 
   busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
-    // THIS THING IS NOT FIRING!!!
     //console.log(fieldname); //image
     //console.log(filename);  //Ideas.jpg
     //console.log(mimetype);  //image/jpeg  /  text/plain (if .txt files)
@@ -229,7 +183,7 @@ exports.uploadImage = (req, res) => {
     const imageExtension = filename.split(".")[filename.split(".").length - 1];
     //img.png => 2341241234123432.png
     imageFileName = `${Math.round(
-      Math.random() * 10000000000
+      Math.random() * 1000000000000
     )}.${imageExtension}`;
     const filepath = path.join(os.tmpdir(), imageFileName);
 
@@ -250,6 +204,21 @@ exports.uploadImage = (req, res) => {
         //without the 'alt=media' parameter the link is just gonna download the image instead of displaying it
         const imageUrl = `https://firebasestorage.googleapis.com/v0/b/${config.storageBucket}/o/${imageFileName}?alt=media`;
         return db.doc(`/users/${req.user.handle}`).update({ imageUrl });
+      })
+      .then(() => {
+        // delete the previous image in storage if exist
+        const imageUrl = req.user.imageUrl;
+        if (
+          imageUrl !==
+          "https://firebasestorage.googleapis.com/v0/b/apu-fyp-3cfd9.appspot.com/o/no-img.png?alt=media"
+        ) {
+          const imageName = imageUrl.match(/\/o\/(.*?)\?alt=media/)[1];
+          return admin
+            .storage()
+            .bucket(config.storageBucket)
+            .file(imageName)
+            .delete();
+        }
       })
       .then(() => {
         return res.json({ message: "image uploaded successfully" });

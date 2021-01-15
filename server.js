@@ -44,17 +44,21 @@ const {
   disableItem,
   enableItem,
   getPost,
-  getPosts,
+  getMyPosts,
   getAllPosts,
+  getUserDetails,
+  editPost,
 } = require("./handlers/posts");
 app.get("/api/post/:postId", getPost); // get detail of a post
 app.get("/api/posts", FBAuth, getAllPosts); // get all posts
-app.get("/api/post", FBAuth, getPosts); // get own posts
+app.get("/api/myposts", FBAuth, getMyPosts); // get own posts
 app.post("/api/post", FBAuth, postAnItem); // post an item
 app.post("/api/post/image", FBAuth, uploadItemImage); // post item image (return the image URL)
 app.get("/api/post/:postId/disable", FBAuth, disableItem); // disable item
 app.get("/api/post/:postId/enable", FBAuth, enableItem); // enable item
 app.delete("/api/post/:postId", FBAuth, deletePost); // delete a post
+app.get("/api/user/:handle", getUserDetails); // retrieve other user details
+app.post("/api/post/:postId", FBAuth, editPost); // edit a post
 
 // user routes
 const {
@@ -63,15 +67,15 @@ const {
   getAuthenticatedUser,
   uploadImage,
   updateUserDetails,
-  getUserDetails,
 } = require("./handlers/users");
 app.post("/api/signup", signup); // signup route
 app.post("/api/login", login); // login route
 app.post("/api/user", FBAuth, updateUserDetails); // update user details route
 app.get("/api/user", FBAuth, getAuthenticatedUser); // retrieve user details
-app.get("/api/user/:handle", getUserDetails); // retrieve other user details
 app.post("/api/user/image", FBAuth, uploadImage); // image upload route
 
 app.listen(port, () => {
   console.log(`Server is running on port: ${port}`);
 });
+
+// https://dzone.com/articles/deploy-your-node-express-app-on-heroku-in-8-easy-s
