@@ -146,16 +146,14 @@ exports.getAuthenticatedUser = (req, res) => {
   db.doc(`/users/${req.user.handle}`)
     .get()
     .then((doc) => {
-      if (!doc.exists) {
-        return res.status(404).json({ error: "User not found" });
-      }
+      if (!doc.exists) throw res.status(404).json({ error: "User not found" });
 
       userData.credentials = doc.data();
       return res.json(userData);
     })
     .catch((err) => {
-      console.error(err);
-      return res.status(500).json({ error: err.code });
+      return err;
+      // return res.status(500).json({ error: err.code });
     });
 };
 

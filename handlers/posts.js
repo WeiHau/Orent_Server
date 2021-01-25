@@ -112,14 +112,14 @@ exports.getPost = (req, res) => {
   db.doc(`/posts/${req.params.postId}`)
     .get()
     .then((doc) => {
-      if (!doc.exists) return res.status(404).json({ error: "Post not found" });
+      if (!doc.exists) throw res.status(404).json({ error: "Post not found" });
 
       itemDetail = doc.data();
 
       return db.doc(`/users/${itemDetail.userHandle}`).get();
     })
     .then((doc) => {
-      if (!doc.exists) return res.status(404).json({ error: "User not found" });
+      if (!doc.exists) throw res.status(404).json({ error: "User not found" });
 
       itemDetail.userImage = doc.data().imageUrl;
       itemDetail.userContact = doc.data().contact;
@@ -127,8 +127,7 @@ exports.getPost = (req, res) => {
       return res.json(itemDetail);
     })
     .catch((err) => {
-      console.error(err);
-      return res.status(500).json({ error: err.code });
+      return err;
     });
 };
 
@@ -153,7 +152,7 @@ exports.getMyPosts = (req, res) => {
       return res.json(posts);
     })
     .catch((err) => {
-      console.error(err);
+      // console.error(err);
       return res.status(500).json({ error: err.code });
     });
 };
@@ -161,7 +160,6 @@ exports.getMyPosts = (req, res) => {
 // post an item
 exports.postAnItem = (req, res) => {
   let { valid, errors } = validatePost(req.body);
-  console.log(req.body);
   if (!valid) return res.status(400).json(errors);
 
   const newPost = {
@@ -243,13 +241,10 @@ exports.deletePost = (req, res) => {
   document
     .get()
     .then((doc) => {
-      if (!doc.exists) {
-        return res.status(404).json({ error: "Post not found" });
-      }
+      if (!doc.exists) throw res.status(404).json({ error: "Post not found" });
 
-      if (doc.data().userHandle !== req.user.handle) {
-        return res.status(403).json({ error: "Unauthorized" });
-      }
+      if (doc.data().userHandle !== req.user.handle)
+        throw res.status(403).json({ error: "Unauthorized" });
 
       // delete image in storage
       const imageUrl = doc.data().item.image;
@@ -268,8 +263,9 @@ exports.deletePost = (req, res) => {
       res.json({ message: "Post deleted successfully" });
     })
     .catch((err) => {
-      console.error(err);
-      return res.status(500).json({ error: err.code });
+      // console.error(err);
+      return err;
+      //return res.status(500).json({ error: err.code });
     });
 };
 
@@ -281,17 +277,13 @@ exports.disableItem = (req, res) => {
   postDocument
     .get()
     .then((doc) => {
-      if (!doc.exists) {
-        return res.status(404).json({ error: "Post not found" });
-      }
+      if (!doc.exists) throw res.status(404).json({ error: "Post not found" });
 
-      if (doc.data().userHandle !== req.user.handle) {
-        return res.status(403).json({ error: "Unauthorized access" });
-      }
+      if (doc.data().userHandle !== req.user.handle)
+        throw res.status(403).json({ error: "Unauthorized access" });
 
-      if (!doc.data().isAvailable) {
-        return res.status(400).json({ error: "Post already disabled" });
-      }
+      if (!doc.data().isAvailable)
+        throw res.status(400).json({ error: "Post already disabled" });
 
       postData = doc.data();
       postData.postId = doc.id;
@@ -302,8 +294,8 @@ exports.disableItem = (req, res) => {
       return res.json(postData);
     })
     .catch((err) => {
-      console.error(err);
-      res.status(500).json({ err: err.code });
+      // console.error(err);
+      return err;
     });
 };
 
@@ -315,17 +307,14 @@ exports.enableItem = (req, res) => {
   postDocument
     .get()
     .then((doc) => {
-      if (!doc.exists) {
-        return res.status(404).json({ error: "Post not found" });
-      }
+      if (!doc.exists) throw res.status(404).json({ error: "Post not found" });
 
-      if (doc.data().userHandle !== req.user.handle) {
-        return res.status(403).json({ error: "Unauthorized access" });
-      }
+      if (doc.data().userHandle !== req.user.handle)
+        throw res.status(403).json({ error: "Unauthorized access" });
 
-      if (doc.data().isAvailable) {
-        return res.status(400).json({ error: "Post already enabled" });
-      }
+      if (doc.data().isAvailable)
+        throw res.status(400).json({ error: "Post already enabled" });
+
       postData = doc.data();
       postData.postId = doc.id;
       postData.isAvailable = true;
@@ -335,8 +324,8 @@ exports.enableItem = (req, res) => {
       return res.json(postData);
     })
     .catch((err) => {
-      console.error(err);
-      res.status(500).json({ err: err.code });
+      //console.error(err);
+      return err;
     });
 };
 
@@ -388,7 +377,7 @@ exports.uploadItemImage = (req, res) => {
         return res.json(imgUri);
       })
       .catch((err) => {
-        console.error(err.code);
+        //console.error(err.code);
         return res.status(500).json({ image: "Please upload an image" });
       });
   });
@@ -403,9 +392,8 @@ exports.getUserDetails = (req, res) => {
   db.doc(`/users/${req.params.handle}`)
     .get()
     .then((doc) => {
-      if (!doc.exists) {
-        return res.status(404).json({ error: "User not found" });
-      }
+      if (!doc.exists) throw res.status(404).json({ error: "User not found" });
+
       userData.user = doc.data();
       // get the posts
       return db
@@ -434,7 +422,7 @@ exports.getUserDetails = (req, res) => {
       return res.json(userData);
     })
     .catch((err) => {
-      console.error(err);
-      return res.status(500).json({ error: err.code });
+      //console.error(err);
+      return err;
     });
 };
