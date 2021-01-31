@@ -21,18 +21,18 @@ const isPhoneNo = (phoneNo) => {
 exports.validateSignupData = (data) => {
   let errors = {};
 
-  if (isEmpty(data.handle)) errors.handle = "Must not be empty";
+  if (isEmpty(data.handle)) errors.handle = "Please complete this field";
 
   if (isEmpty(data.email)) {
-    errors.email = "Must not be empty";
+    errors.email = "Please complete this field";
   } else if (!isEmail(data.email)) {
-    errors.email = "Must be a valid email address";
+    errors.email = "Please complete this field";
   }
 
-  if (isEmpty(data.password)) errors.password = "Must not be empty";
+  if (isEmpty(data.password)) errors.password = "Please complete this field";
 
   if (data.password !== data.confirmPassword)
-    errors.confirmPassword = "Passwords must match";
+    errors.confirmPassword = "Passwords doesn't match";
 
   return { errors, valid: Object.keys(errors).length === 0 };
 };
@@ -40,8 +40,8 @@ exports.validateSignupData = (data) => {
 exports.validateLoginData = (user) => {
   let errors = {};
 
-  if (isEmpty(user.email)) errors.email = "Must not be empty";
-  if (isEmpty(user.password)) errors.password = "Must not be empty";
+  if (isEmpty(user.email)) errors.email = "Please complete this field";
+  if (isEmpty(user.password)) errors.password = "Please complete this field";
 
   return { errors, valid: Object.keys(errors).length === 0 };
 };
@@ -54,16 +54,16 @@ exports.reduceUserDetails = (data) => {
   let { fullName, address, postcode, city, state } = data;
 
   // validate full name
-  if (isEmpty(fullName)) errors.fullName = "Must not be empty";
-  else if (!isFullName(fullName)) errors.fullName = "Must be a valid full name";
+  if (isEmpty(fullName)) errors.fullName = "Please complete this field";
+  else if (!isFullName(fullName)) errors.fullName = "Please enter a valid name";
 
   // validate location
-  if (isEmpty(address)) errors.address = "Must not be empty";
-  if (isEmpty(postcode)) errors.postcode = "Must not be empty";
+  if (isEmpty(address)) errors.address = "Please complete this field";
+  if (isEmpty(postcode)) errors.postcode = "Please complete this field";
   else if (postcode.length !== 5 || isNaN(postcode))
-    errors.postcode = "Must be a valid postcode";
-  if (isEmpty(city)) errors.city = "Must not be empty";
-  if (isEmpty(state)) errors.state = "Must not be empty";
+    errors.postcode = "Please enter a valid postcode";
+  if (isEmpty(city)) errors.city = "Please complete this field";
+  if (isEmpty(state)) errors.state = "Please complete this field";
 
   // if user filled up all the details needed
   userDetails.fullName = fullName;
@@ -79,7 +79,8 @@ exports.reduceUserDetails = (data) => {
   userDetails.contact = {};
   // validate & reduce phone number
   if (phoneNo && !isEmpty(phoneNo)) {
-    if (!isPhoneNo(phoneNo)) errors.phoneNo = "Must be a valid phone number";
+    if (!isPhoneNo(phoneNo))
+      errors.phoneNo = "Please enter a valid phone number";
     else {
       phoneNo = phoneNo.match(/\d/g).join("");
       if (phoneNo.charAt(0) !== "6") phoneNo = "6" + phoneNo;
@@ -112,11 +113,11 @@ exports.validatePost = (postInfo) => {
   let errors = {};
   let { name, description, image, price } = postInfo;
 
-  if (isEmpty(name)) errors.name = "Must not be empty";
-  if (isEmpty(description)) errors.description = "Must not be empty";
-  if (isEmpty(image)) errors.image = "Must not be empty";
-  if (isEmpty(price)) errors.price = "Must not be empty";
-  else if (isNaN(price)) errors.price = "Must be a valid price";
+  if (isEmpty(name)) errors.name = "Please complete this field";
+  if (isEmpty(description)) errors.description = "Please complete this field";
+  if (isEmpty(image)) errors.image = "Please complete this field";
+  if (isEmpty(price)) errors.price = "Please complete this field";
+  else if (isNaN(price)) errors.price = "NaN";
 
   return { errors, valid: Object.keys(errors).length === 0 };
 };
