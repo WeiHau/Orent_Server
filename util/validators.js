@@ -26,7 +26,7 @@ exports.validateSignupData = (data) => {
   if (isEmpty(data.email)) {
     errors.email = "Please complete this field";
   } else if (!isEmail(data.email)) {
-    errors.email = "Please complete this field";
+    errors.email = "Please enter a valid email";
   }
 
   if (isEmpty(data.password)) errors.password = "Please complete this field";
