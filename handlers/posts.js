@@ -82,8 +82,8 @@ exports.getAllPosts = (req, res) => {
         return;
 
       // filter price
-      if (minPrice && item.price <= minPrice) return;
-      if (maxPrice && item.price >= maxPrice) return;
+      if (minPrice && item.price < minPrice) return;
+      if (maxPrice && item.price > maxPrice) return;
 
       if (locationGiven && mismatchLocation(locationGiven, doc.data().location))
         return;
