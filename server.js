@@ -67,15 +67,157 @@ const {
   getAuthenticatedUser,
   uploadImage,
   updateUserDetails,
+  updateExpoPushToken,
 } = require("./handlers/users");
 app.post("/api/signup", signup); // signup route
 app.post("/api/login", login); // login route
 app.post("/api/user", FBAuth, updateUserDetails); // update user details route
 app.get("/api/user", FBAuth, getAuthenticatedUser); // retrieve user details
 app.post("/api/user/image", FBAuth, uploadImage); // image upload route
+app.post("/api/user/expoPushToken", FBAuth, updateExpoPushToken);
 
-app.listen(port, () => {
+// message routes
+const { getUserMessages, readMessages } = require("./handlers/messages");
+app.get("/api/messages", FBAuth, getUserMessages); // get userMessages of the logged in user
+app.get("/api/messages/:handle/read", FBAuth, readMessages);
+
+const server = app.listen(port, () => {
   console.log(`Server is running on port: ${port}`);
 });
 
+// socket.io stuff
+const io = require("socket.io")(server);
+
+// for notifications
+const { Expo } = require("expo-server-sdk");
+let expo = new Expo({ accessToken: process.env.EXPO_ACCESS_TOKEN });
+
+// to save in db for message sent
+const db = admin.firestore();
+
+let clients = [];
+
+io.on("connection", (socket) => {
+  socket.on("storeClientInfo", (data) => {
+    const clientInfo = new Object();
+    clientInfo.customId = data.customId;
+    console.log("user connected: " + data.customId);
+    clientInfo.clientId = socket.id;
+
+    // remove client if already exist in clients list
+    clients = clients.filter((client) => client.customId != data.customId);
+    // console.log("Before: " + JSON.stringify(clients));
+    clients.push(clientInfo);
+    console.log(clients);
+  });
+
+  // user sent a message
+  socket.on("send-message", (message) => {
+    // console.log("user messaged: " + message.content);
+
+    // emit message to recipient
+    let recipientClientIndex = clients.findIndex(
+      (client) => client.customId == message.recipient
+    );
+    if (recipientClientIndex !== -1) {
+      // if recipient is online (probably)
+      // send message to that specific client
+      io.to(clients[recipientClientIndex].clientId).emit(
+        "receive-message",
+        message
+      );
+    } else if (
+      message.recipientPushToken &&
+      Expo.isExpoPushToken(message.recipientPushToken)
+    ) {
+      // Construct a message (see https://docs.expo.io/push-notifications/sending-notifications/)
+      const notificationMessage = {
+        to: message.recipientPushToken,
+        sound: "default",
+        title: message.senderFullName,
+        body: message.content,
+        data: { senderHandle: message.sender },
+      };
+
+      // https://github.com/expo/expo-server-sdk-node
+      let chunks = expo.chunkPushNotifications([notificationMessage]);
+      let tickets = [];
+      (async () => {
+        // Send the chunks to the Expo push notification service. There are
+        // different strategies you could use. A simple one is to send one chunk at a
+        // time, which nicely spreads the load out over time:
+        for (let chunk of chunks) {
+          try {
+            let ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+            // console.log(ticketChunk);
+            tickets.push(...ticketChunk);
+            // NOTE: If a ticket contains an error code in ticket.details.error, you
+            // must handle it appropriately. The error codes are listed in the Expo
+            // documentation:
+            // https://docs.expo.io/push-notifications/sending-notifications/#individual-errors
+          } catch (error) {
+            console.error(error);
+          }
+        }
+      })();
+    }
+
+    // save message to db
+    db.collection("messages")
+      .add(message)
+      .catch((err) => {
+        // res.status(500).json({ error: "something went wrong" });
+        console.error(err);
+      });
+  });
+
+  socket.on("pre-disconnect", (data) => {
+    let i = clients.findIndex((client) => client.customId == data.customId);
+    console.log("user disconnecting: " + data.customId);
+    // console.log(clients);
+    if (i !== -1) clients.splice(i, 1);
+    console.log(clients);
+  });
+
+  socket.on("disconnect", () => {
+    //console.log("user disconnected");
+    //console.log(clients);
+  });
+});
+
 // https://dzone.com/articles/deploy-your-node-express-app-on-heroku-in-8-easy-s
+
+// // reset data (for developer ;) )
+// app.get("/api/clear/posts", (req, res) => {
+//   db.collection("posts")
+//     .get()
+//     .then((data) => {
+//       data.forEach((doc) => {
+//         const document = db.doc(`/posts/${doc.id}`);
+//         document.delete();
+//       });
+
+//       return res.status(200).json({});
+//     })
+//     .catch((err) => {
+//       console.log(err);
+//       return err;
+//     });
+// });
+
+// app.get("/api/clear/messages", (req, res) => {
+//   db.collection("messages")
+//     .get()
+//     .then((data) => {
+//       data.forEach((doc) => {
+//         const document = db.doc(`/messages/${doc.id}`);
+//         document.delete();
+//       });
+
+//       return res.status(200).json({});
+//     })
+//     .catch((err) => {
+//       console.log(err);
+//       return err;
+//     });
+// });

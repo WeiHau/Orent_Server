@@ -140,6 +140,7 @@ exports.getMyPosts = (req, res) => {
     .then((data) => {
       const posts = [];
 
+      // adding postId to each doc
       data.forEach((doc) => {
         posts.push({
           item: doc.data().item,

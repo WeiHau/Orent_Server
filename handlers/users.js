@@ -143,6 +143,21 @@ exports.updateUserDetails = (req, res) => {
     });
 };
 
+exports.updateExpoPushToken = (req, res) => {
+  let { expoPushToken } = req.body;
+
+  // console.log("the token: " + expoPushToken);
+  db.doc(`users/${req.user.handle}`)
+    .update({ expoPushToken })
+    .then(() => {
+      return res.json({ message: "Push token updated successfully" });
+    })
+    .catch((err) => {
+      console.error(err);
+      return res.status(500).json({ error: err.code });
+    });
+};
+
 // Get own user details
 exports.getAuthenticatedUser = (req, res) => {
   let userData = {};
