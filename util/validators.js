@@ -2,6 +2,11 @@ const isEmpty = (string) => {
   return string.trim() === "";
 };
 
+const isHandle = (handle) => {
+  const regEx = /^(?=.{4,20}$)(?![_.])(?!.*[_.]{2})[a-zA-Z0-9._]+(?<![_.])$/;
+  return handle.match(regEx);
+};
+
 const isEmail = (email) => {
   const regEx = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   return email.match(regEx);
@@ -22,14 +27,17 @@ exports.validateSignupData = (data) => {
   let errors = {};
 
   if (isEmpty(data.handle)) errors.handle = "Please complete this field";
+  else if (!isHandle(data.handle))
+    errors.handle = "Please enter a valid handle";
 
-  if (isEmpty(data.email)) {
-    errors.email = "Please complete this field";
-  } else if (!isEmail(data.email)) {
-    errors.email = "Please enter a valid email";
-  }
+  if (isEmpty(data.email)) errors.email = "Please complete this field";
+  else if (!isEmail(data.email)) errors.email = "Please enter a valid email";
+  else if (data.email.length > 60)
+    errors.email = "Please enter a shorter email";
 
   if (isEmpty(data.password)) errors.password = "Please complete this field";
+  else if (data.password.length > 50)
+    errors.password = "Please enter a shorter password";
 
   if (data.password !== data.confirmPassword)
     errors.confirmPassword = "Passwords doesn't match";
@@ -56,13 +64,19 @@ exports.reduceUserDetails = (data) => {
   // validate full name
   if (isEmpty(fullName)) errors.fullName = "Please complete this field";
   else if (!isFullName(fullName)) errors.fullName = "Please enter a valid name";
+  else if (fullName.length > 65)
+    errors.fullName = "Please enter a shorter name";
 
   // validate location
   if (isEmpty(address)) errors.address = "Please complete this field";
+  else if (address.length > 90)
+    errors.address = "Please enter a shorter address";
+
   if (isEmpty(postcode)) errors.postcode = "Please complete this field";
   else if (postcode.length !== 5 || isNaN(postcode))
-    errors.postcode = "Please enter a valid postcode";
+    errors.postcode = "Please enter a valid Malaysia postcode";
   if (isEmpty(city)) errors.city = "Please complete this field";
+  else if (city.length > 35) errors.city = "Please enter a shorter city name";
   if (isEmpty(state)) errors.state = "Please complete this field";
 
   // if user filled up all the details needed
@@ -114,6 +128,7 @@ exports.validatePost = (postInfo) => {
   let { name, description, image, price } = postInfo;
 
   if (isEmpty(name)) errors.name = "Please complete this field";
+  else if (name.length > 30) error.name = "Please enter a shorter title";
   if (isEmpty(description)) errors.description = "Please complete this field";
   if (isEmpty(image)) errors.image = "Please complete this field";
   if (isEmpty(price)) errors.price = "Please complete this field";
