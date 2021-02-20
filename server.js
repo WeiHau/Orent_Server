@@ -81,12 +81,17 @@ const { getUserMessages, readMessages } = require("./handlers/messages");
 app.get("/api/messages", FBAuth, getUserMessages); // get userMessages of the logged in user
 app.get("/api/messages/:handle/read", FBAuth, readMessages);
 
-const server = app.listen(port, () => {
-  console.log(`Server is running on port: ${port}`);
-});
+// app.listen(port, () => {
+//   console.log(`Server is running on port: ${port}`);
+// });
 
 // socket.io stuff
-const io = require("socket.io")(server);
+const http = require("http").createServer(app);
+const io = require("socket.io")(http);
+
+http.listen(port, () => {
+  console.log(`Server is running on port: ${port}`);
+});
 
 // for notifications
 const { Expo } = require("expo-server-sdk");
