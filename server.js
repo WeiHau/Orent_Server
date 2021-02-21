@@ -81,17 +81,12 @@ const { getUserMessages, readMessages } = require("./handlers/messages");
 app.get("/api/messages", FBAuth, getUserMessages); // get userMessages of the logged in user
 app.get("/api/messages/:handle/read", FBAuth, readMessages);
 
-// app.listen(port, () => {
-//   console.log(`Server is running on port: ${port}`);
-// });
-
-// socket.io stuff
-const http = require("http").createServer(app);
-const io = require("socket.io")(http);
-
-http.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Server is running on port: ${port}`);
 });
+
+// socket.io stuff
+const io = require("socket.io")(server);
 
 // for notifications
 const { Expo } = require("expo-server-sdk");
@@ -167,9 +162,11 @@ io.on("connection", (socket) => {
       })();
     }
 
+    // remove recipientPushToken & senderFullName, we only need that for notifications
+    const { recipientPushToken, senderFullName, ...rest } = message;
     // save message to db
     db.collection("messages")
-      .add(message)
+      .add(rest)
       .catch((err) => {
         // res.status(500).json({ error: "something went wrong" });
         console.error(err);
