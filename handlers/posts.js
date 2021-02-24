@@ -164,7 +164,10 @@ exports.postAnItem = (req, res) => {
   if (!valid) return res.status(400).json(errors);
 
   const newPost = {
-    item: { ...req.body, price: Math.round(req.body.price * 100) / 100 },
+    item: {
+      ...req.body,
+      price: Math.floor(req.body.price * 100) / 100,
+    },
     isAvailable: true,
     userHandle: req.user.handle, //got thru the middleware
     location: req.user.location,
@@ -191,12 +194,12 @@ exports.editPost = (req, res) => {
   if (!valid) return res.status(400).json(errors);
 
   const editedPost = {
-    item: req.body,
+    item: { ...req.body, price: Math.floor(req.body.price * 100) / 100 },
   };
 
   const document = db.doc(`/posts/${req.params.postId}`);
 
-  const updateDocument = () =>
+  const updateDocument = () => {
     document
       .update(editedPost)
       .then(() => {
@@ -211,6 +214,7 @@ exports.editPost = (req, res) => {
         res.status(500).json({ error: "something went wrong" });
         console.error(err);
       });
+  };
 
   document
     .get()

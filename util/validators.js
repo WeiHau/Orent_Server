@@ -69,7 +69,7 @@ exports.reduceUserDetails = (data) => {
 
   // validate location
   if (isEmpty(address)) errors.address = "Please complete this field";
-  else if (address.length > 90)
+  else if (address.length > 100)
     errors.address = "Please enter a shorter address";
 
   if (isEmpty(postcode)) errors.postcode = "Please complete this field";
@@ -128,11 +128,12 @@ exports.validatePost = (postInfo) => {
   let { name, description, image, price } = postInfo;
 
   if (isEmpty(name)) errors.name = "Please complete this field";
-  else if (name.length > 30) error.name = "Please enter a shorter title";
+  else if (name.length > 50) errors.name = "Please enter a shorter title";
   if (isEmpty(description)) errors.description = "Please complete this field";
   if (isEmpty(image)) errors.image = "Please complete this field";
   if (isEmpty(price)) errors.price = "Please complete this field";
   else if (isNaN(price)) errors.price = "NaN";
+  else if (parseInt(price) > 999999) errors.price = "Lower!";
 
   return { errors, valid: Object.keys(errors).length === 0 };
 };
