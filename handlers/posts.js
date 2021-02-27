@@ -358,7 +358,7 @@ exports.uploadItemImage = (req, res) => {
     const imageExtension = filename.split(".")[filename.split(".").length - 1];
     //img.png => 2341241234123432.png
     imageFileName = `${Math.round(
-      Math.random() * 1000000000000
+      Math.random() * 1000000000000000
     )}.${imageExtension}`;
     const filepath = path.join(os.tmpdir(), imageFileName);
 

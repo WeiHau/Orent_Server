@@ -196,9 +196,31 @@ io.on("connection", (socket) => {
 //     .then((data) => {
 //       data.forEach((doc) => {
 //         const document = db.doc(`/posts/${doc.id}`);
-//         document.delete();
-//       });
+//         document
+//           .get()
+//           .then((doc) => {
+//             if (!doc.exists)
+//               throw res.status(404).json({ error: "Post not found" });
 
+//             // delete image in storage
+//             const imageUrl = doc.data().item.image;
+//             const imageName = imageUrl.match(/\/o\/(.*?)\?alt=media/)[1];
+
+//             return admin
+//               .storage()
+//               .bucket(config.storageBucket)
+//               .file(imageName)
+//               .delete();
+//           })
+//           .then(() => {
+//             return document.delete();
+//           })
+//           .catch((err) => {
+//             // console.error(err);
+//             return err;
+//             //return res.status(500).json({ error: err.code });
+//           });
+//       });
 //       return res.status(200).json({});
 //     })
 //     .catch((err) => {
