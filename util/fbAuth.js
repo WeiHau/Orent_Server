@@ -1,3 +1,9 @@
+// Programmer Name     : Lim Wei Hau
+// Program Name        : fbAuth.js
+// Description         : middleware authentication for api requests that requires authentication
+// First Written on    : 25 December 2020
+// Last Edited on      : 03 March 2021
+
 const admin = require("firebase-admin");
 const db = admin.firestore();
 
@@ -39,7 +45,6 @@ module.exports = (req, res, next) => {
       //   >
       // }
       req.user = decodedToken; // the passed request(req) will have an additional data from this middleware
-      //console.log(decodedToken);
       return db
         .collection("/users")
         .where("userId", "==", req.user.uid)

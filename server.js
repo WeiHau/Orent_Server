@@ -1,3 +1,9 @@
+// Programmer Name     : Lim Wei Hau
+// Program Name        : server.js
+// Description         : The 'main' file that runs upon compile. Initialized firebase, websocket and all the api endpoints
+// First Written on    : 20 December 2020
+// Last Edited on      : 03 March 2021
+
 const express = require("express");
 const cors = require("cors");
 
@@ -48,6 +54,11 @@ const {
   getAllPosts,
   getUserDetails,
   editPost,
+  sendRentalRequest,
+  getRentalRequests,
+  getRentalActivities,
+  approveRentalRequest,
+  removeRentalRequest,
 } = require("./handlers/posts");
 app.get("/api/post/:postId", getPost); // get detail of a post
 app.get("/api/posts", FBAuth, getAllPosts); // get all posts
@@ -59,6 +70,12 @@ app.get("/api/post/:postId/enable", FBAuth, enableItem); // enable item
 app.delete("/api/post/:postId", FBAuth, deletePost); // delete a post
 app.get("/api/user/:handle", getUserDetails); // retrieve other user details
 app.post("/api/post/:postId", FBAuth, editPost); // edit a post
+
+app.post("/api/rentalRequest/", FBAuth, sendRentalRequest); // send a rental request
+app.get("/api/rentalRequests/", FBAuth, getRentalRequests);
+app.get("/api/rentalActivities/", FBAuth, getRentalActivities);
+app.get("/api/rentalRequest/approve/:requestId", FBAuth, approveRentalRequest);
+app.get("/api/rentalRequest/remove/:requestId", FBAuth, removeRentalRequest);
 
 // user routes
 const {
@@ -85,7 +102,7 @@ const server = app.listen(port, () => {
   console.log(`Server is running on port: ${port}`);
 });
 
-// socket.io stuff
+// socket.io
 const io = require("socket.io")(server);
 
 // for notifications
@@ -106,15 +123,12 @@ io.on("connection", (socket) => {
 
     // remove client if already exist in clients list
     clients = clients.filter((client) => client.customId != data.customId);
-    // console.log("Before: " + JSON.stringify(clients));
     clients.push(clientInfo);
     console.log(clients);
   });
 
   // user sent a message
   socket.on("send-message", (message) => {
-    // console.log("user messaged: " + message.content);
-
     // emit message to recipient
     let recipientClientIndex = clients.findIndex(
       (client) => client.customId == message.recipient
@@ -139,7 +153,6 @@ io.on("connection", (socket) => {
         data: { senderHandle: message.sender },
       };
 
-      // https://github.com/expo/expo-server-sdk-node
       let chunks = expo.chunkPushNotifications([notificationMessage]);
       let tickets = [];
       (async () => {
@@ -168,7 +181,6 @@ io.on("connection", (socket) => {
     db.collection("messages")
       .add(rest)
       .catch((err) => {
-        // res.status(500).json({ error: "something went wrong" });
         console.error(err);
       });
   });
@@ -176,72 +188,7 @@ io.on("connection", (socket) => {
   socket.on("pre-disconnect", (data) => {
     let i = clients.findIndex((client) => client.customId == data.customId);
     console.log("user disconnecting: " + data.customId);
-    // console.log(clients);
     if (i !== -1) clients.splice(i, 1);
     console.log(clients);
   });
-
-  socket.on("disconnect", () => {
-    //console.log("user disconnected");
-    //console.log(clients);
-  });
 });
-
-// https://dzone.com/articles/deploy-your-node-express-app-on-heroku-in-8-easy-s
-
-// // reset data (for developer ;) )
-// app.get("/api/clear/posts", (req, res) => {
-//   db.collection("posts")
-//     .get()
-//     .then((data) => {
-//       data.forEach((doc) => {
-//         const document = db.doc(`/posts/${doc.id}`);
-//         document
-//           .get()
-//           .then((doc) => {
-//             if (!doc.exists)
-//               throw res.status(404).json({ error: "Post not found" });
-
-//             // delete image in storage
-//             const imageUrl = doc.data().item.image;
-//             const imageName = imageUrl.match(/\/o\/(.*?)\?alt=media/)[1];
-
-//             return admin
-//               .storage()
-//               .bucket(config.storageBucket)
-//               .file(imageName)
-//               .delete();
-//           })
-//           .then(() => {
-//             return document.delete();
-//           })
-//           .catch((err) => {
-//             // console.error(err);
-//             return err;
-//             //return res.status(500).json({ error: err.code });
-//           });
-//       });
-//       return res.status(200).json({});
-//     })
-//     .catch((err) => {
-//       console.log(err);
-//       return err;
-//     });
-// });
-
-// app.get("/api/clear/messages", (req, res) => {
-//   db.collection("messages")
-//     .get()
-//     .then((data) => {
-//       data.forEach((doc) => {
-//         const document = db.doc(`/messages/${doc.id}`);
-//         document.delete();
-//       });
-
-//       return res.status(200).json({});
-//     })
-//     .catch((err) => {
-//       console.log(err);
-//       return err;
-//     });
-// });

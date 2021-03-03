@@ -1,3 +1,9 @@
+// Programmer Name     : Lim Wei Hau
+// Program Name        : users.js
+// Description         : All the users functions to handle api requests relevant to users
+// First Written on    : 20 December 2020
+// Last Edited on      : 03 March 2021
+
 const firebase = require("firebase");
 const admin = require("firebase-admin");
 
@@ -27,7 +33,7 @@ exports.signup = (req, res) => {
 
   const noImg = "no-img.png";
 
-  let token, userId;
+  let userId;
   db.doc(`/users/${newUser.handle}`)
     .get()
     .then((doc) => {
@@ -47,10 +53,10 @@ exports.signup = (req, res) => {
       //the credential is returned
       //if we are here then we've successfully registered
       userId = data.user.uid;
-      return data.user.getIdToken();
+      let user = firebase.auth().currentUser;
+      return user.sendEmailVerification();
     })
-    .then((idToken) => {
-      token = idToken;
+    .then(() => {
       const userCredentials = {
         handle: newUser.handle,
         createdAt: new Date().toISOString(),
@@ -61,10 +67,9 @@ exports.signup = (req, res) => {
       return db.doc(`/users/${newUser.handle}`).set(userCredentials);
     })
     .then(() => {
-      return res.status(201).json({ token });
+      return res.status(201).json({});
     })
     .catch((err) => {
-      // console.error(err);
       if (err.code === "auth/email-already-in-use") {
         return res.status(400).json({ email: "Email is already in use" });
       } else if (err.code === "auth/weak-password") {
@@ -94,6 +99,8 @@ exports.login = (req, res) => {
     .auth()
     .signInWithEmailAndPassword(user.email, user.password)
     .then((data) => {
+      let user = firebase.auth().currentUser;
+      if (!user.emailVerified) throw { code: "email not verified" };
       return data.user.getIdToken();
     })
     .then((token) => {
@@ -103,9 +110,15 @@ exports.login = (req, res) => {
       console.error(err);
       // auth/wrong-password
       // auth/user-not-user
-      return res
-        .status(403)
-        .json({ error: "Wrong credentials, please try again" });
+      if (err.code === "email not verified") {
+        return res
+          .status(403)
+          .json({ error: "Email not verified. Please check your mailbox." });
+      } else {
+        return res
+          .status(403)
+          .json({ error: "Wrong credentials, please try again" });
+      }
     });
 };
 
@@ -146,7 +159,6 @@ exports.updateUserDetails = (req, res) => {
 exports.updateExpoPushToken = (req, res) => {
   let { expoPushToken } = req.body;
 
-  // console.log("the token: " + expoPushToken);
   db.doc(`users/${req.user.handle}`)
     .update({ expoPushToken })
     .then(() => {
@@ -161,7 +173,6 @@ exports.updateExpoPushToken = (req, res) => {
 // Get own user details
 exports.getAuthenticatedUser = (req, res) => {
   let userData = {};
-  //console.log(req.user.handle);
   db.doc(`/users/${req.user.handle}`)
     .get()
     .then((doc) => {
@@ -172,7 +183,6 @@ exports.getAuthenticatedUser = (req, res) => {
     })
     .catch((err) => {
       return err;
-      // return res.status(500).json({ error: err.code });
     });
 };
 
@@ -189,10 +199,6 @@ exports.uploadImage = (req, res) => {
   let imageToBeUploaded = {};
 
   busboy.on("file", (fieldname, file, filename, encoding, mimetype) => {
-    //console.log(fieldname); //image
-    //console.log(filename);  //Ideas.jpg
-    //console.log(mimetype);  //image/jpeg  /  text/plain (if .txt files)
-
     if (mimetype !== "image/jpeg" && mimetype !== "image/png") {
       return res.status(400).json({ error: "Wrong file type submitted" });
     }

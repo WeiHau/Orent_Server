@@ -1,3 +1,9 @@
+// Programmer Name     : Lim Wei Hau
+// Program Name        : validators.js
+// Description         : all the validations on the user inputs
+// First Written on    : 25 December 2020
+// Last Edited on      : 03 March 2021
+
 const isEmpty = (string) => {
   return string.trim() === "";
 };
@@ -28,7 +34,7 @@ exports.validateSignupData = (data) => {
 
   if (isEmpty(data.handle)) errors.handle = "Please complete this field";
   else if (!isHandle(data.handle))
-    errors.handle = "Please enter a valid handle";
+    errors.handle = "<characters, numbers and '_' / '.' in between>";
 
   if (isEmpty(data.email)) errors.email = "Please complete this field";
   else if (!isEmail(data.email)) errors.email = "Please enter a valid email";

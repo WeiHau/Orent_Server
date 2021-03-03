@@ -1,7 +1,12 @@
+// Programmer Name     : Lim Wei Hau
+// Program Name        : messages.js
+// Description         : All the messages functions to handle api requests relevant to messages
+// First Written on    : 20 December 2020
+// Last Edited on      : 03 March 2021
+
 const admin = require("firebase-admin");
 const db = admin.firestore();
 
-// need user (remains), firstMessage, noOfUnseenMessages only
 const userExist = (userMessages, userHandle) => {
   return (
     userMessages.findIndex(

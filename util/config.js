@@ -1,3 +1,9 @@
+// Programmer Name     : Lim Wei Hau
+// Program Name        : config.js
+// Description         : configuration for firebase
+// First Written on    : 25 December 2020
+// Last Edited on      : 03 March 2021
+
 require("dotenv/config");
 
 module.exports = {

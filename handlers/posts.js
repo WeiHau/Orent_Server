@@ -1,15 +1,15 @@
+// Programmer Name     : Lim Wei Hau
+// Program Name        : posts.js
+// Description         : All the posts functions to handle api requests relevant to posts
+// First Written on    : 20 December 2020
+// Last Edited on      : 03 March 2021
+
 const admin = require("firebase-admin");
 const db = admin.firestore();
 
 const config = require("../util/config");
 
 const { validatePost } = require("../util/validators");
-
-// Get all posts
-// fetch based on search
-// fetch based on category
-// fetch based on price
-// https://stackoverflow.com/questions/48036975/firestore-multiple-conditional-where-clauses (this may help)
 
 const mismatchAddress = (keyword, itemLocation) =>
   !itemLocation.address.toLowerCase().includes(keyword);
@@ -115,6 +115,7 @@ exports.getPost = (req, res) => {
       if (!doc.exists) throw res.status(404).json({ error: "Post not found" });
 
       itemDetail = doc.data();
+      itemDetail.postId = doc.id;
 
       return db.doc(`/users/${itemDetail.userHandle}`).get();
     })
@@ -216,10 +217,64 @@ exports.editPost = (req, res) => {
       });
   };
 
-  document
+  const deletePostImage = () => {
+    document
+      .get()
+      .then((doc) => {
+        if (doc.data().item.image !== editedPost.item.image) {
+          // delete image in storage
+          const imageUrl = doc.data().item.image;
+          const imageName = imageUrl.match(/\/o\/(.*?)\?alt=media/)[1];
+
+          return admin
+            .storage()
+            .bucket(config.storageBucket)
+            .file(imageName)
+            .delete();
+        }
+      })
+      .then(() => {
+        updateDocument();
+      })
+      .catch(() => {
+        // probably image/object not found for deleting
+        updateDocument();
+      });
+  };
+
+  db.collection("rentalActivities")
+    .where("postId", "==", req.params.postId)
     .get()
-    .then((doc) => {
-      if (doc.data().item.image !== editedPost.item.image) {
+    .then((data) => {
+      console.log(data);
+      let editable = true;
+      data.forEach((doc) => {
+        editable = false;
+      });
+
+      if (!editable) {
+        return res.status(400).json({
+          action: "uneditable",
+        });
+      } else {
+        deletePostImage();
+      }
+    });
+};
+
+// delete a post
+exports.deletePost = (req, res) => {
+  const deleteDocument = () => {
+    const document = db.doc(`/posts/${req.params.postId}`);
+    document
+      .get()
+      .then((doc) => {
+        if (!doc.exists)
+          throw res.status(404).json({ error: "Post not found" });
+
+        if (doc.data().userHandle !== req.user.handle)
+          throw res.status(403).json({ error: "Unauthorized" });
+
         // delete image in storage
         const imageUrl = doc.data().item.image;
         const imageName = imageUrl.match(/\/o\/(.*?)\?alt=media/)[1];
@@ -229,48 +284,38 @@ exports.editPost = (req, res) => {
           .bucket(config.storageBucket)
           .file(imageName)
           .delete();
-      }
-    })
-    .then(() => {
-      updateDocument();
-    })
-    .catch(() => {
-      // probably image/object not found for deleting
-      updateDocument();
-    });
-};
+      })
+      .then(() => {
+        return document.delete();
+      })
+      .then(() => {
+        return res.json({ message: "Post deleted successfully" });
+      })
+      .catch((err) => {
+        // console.error(err);
+        return err;
+        //return res.status(500).json({ error: err.code });
+      });
+  };
 
-// delete a post
-exports.deletePost = (req, res) => {
-  const document = db.doc(`/posts/${req.params.postId}`);
-  document
+  // (if exist in rental activities, cant delete)
+
+  db.collection("rentalActivities")
+    .where("postId", "==", req.params.postId)
     .get()
-    .then((doc) => {
-      if (!doc.exists) throw res.status(404).json({ error: "Post not found" });
+    .then((data) => {
+      let deletable = true;
+      data.forEach((doc) => {
+        deletable = false;
+      });
 
-      if (doc.data().userHandle !== req.user.handle)
-        throw res.status(403).json({ error: "Unauthorized" });
-
-      // delete image in storage
-      const imageUrl = doc.data().item.image;
-      const imageName = imageUrl.match(/\/o\/(.*?)\?alt=media/)[1];
-
-      return admin
-        .storage()
-        .bucket(config.storageBucket)
-        .file(imageName)
-        .delete();
-    })
-    .then(() => {
-      return document.delete();
-    })
-    .then(() => {
-      res.json({ message: "Post deleted successfully" });
-    })
-    .catch((err) => {
-      // console.error(err);
-      return err;
-      //return res.status(500).json({ error: err.code });
+      if (!deletable) {
+        return res.status(400).json({
+          action: "undeletable",
+        });
+      } else {
+        deleteDocument();
+      }
     });
 };
 
@@ -425,6 +470,263 @@ exports.getUserDetails = (req, res) => {
       });
 
       return res.json(userData);
+    })
+    .catch((err) => {
+      //console.error(err);
+      return err;
+    });
+};
+
+// send a rental request
+exports.sendRentalRequest = (req, res) => {
+  // return response only
+
+  const requestObject = {
+    renter: req.user.handle,
+    owner: req.body.handle,
+    postId: req.body.postId,
+    startDate: req.body.startDate,
+    endDate: req.body.endDate,
+    totalCost: req.body.totalCost,
+    approval: "pending",
+    createdAt: new Date().toISOString(),
+  };
+
+  db.doc(`/posts/${req.body.postId}`)
+    .get()
+    .then((doc) => {
+      if (!doc.exists) return res.status(404).json({ error: "post not found" });
+      else {
+        db.collection("rentalActivities")
+          .add(requestObject)
+          .then((doc) => {
+            const resReq = requestObject;
+            resReq.requestId = doc.id;
+            res.json(resReq);
+          })
+          .catch((err) => {
+            res.status(500).json({ error: "something went wrong" });
+            console.error(err);
+          });
+      }
+    });
+};
+
+// fetch rental requests (approval: 'pending)
+exports.getRentalRequests = (req, res) => {
+  // return response only
+
+  db.collection("rentalActivities")
+    .where("approval", "==", "pending")
+    .orderBy("createdAt", "desc")
+    .get()
+    .then((data) => {
+      const rentalRequests = [];
+
+      let todayDate = new Date();
+      data.forEach((doc) => {
+        // (remove if endDate have passed)
+        let requestEndDate = new Date(doc.data().endDate);
+        if (
+          requestEndDate.setHours(0, 0, 0, 0) < todayDate.setHours(0, 0, 0, 0)
+        ) {
+          // endDate have passed
+          db.doc(`/rentalActivities/${doc.id}`).delete();
+          return;
+        }
+
+        if (doc.data().renter === req.user.handle) {
+          rentalRequests.push({
+            requestId: doc.id,
+            amRenter: true,
+            post: { postId: doc.data().postId },
+            user: { handle: doc.data().owner },
+            startDate: doc.data().startDate,
+            endDate: doc.data().endDate,
+            totalCost: doc.data().totalCost,
+            createdAt: doc.data().createdAt,
+          });
+        } else if (doc.data().owner === req.user.handle) {
+          rentalRequests.push({
+            requestId: doc.id,
+            amRenter: false,
+            post: { postId: doc.data().postId },
+            user: { handle: doc.data().renter },
+            startDate: doc.data().startDate,
+            endDate: doc.data().endDate,
+            totalCost: doc.data().totalCost,
+            createdAt: doc.data().createdAt,
+          });
+        }
+      });
+
+      return Promise.all(
+        rentalRequests.map(async (rentalRequest) => {
+          let userDoc = await db
+            .doc(`/users/${rentalRequest.user.handle}`)
+            .get();
+          let postDoc = await db
+            .doc(`/posts/${rentalRequest.post.postId}`)
+            .get();
+
+          let { fullName, imageUrl } = userDoc.data();
+          rentalRequest.user.fullName = fullName;
+          rentalRequest.user.imageUri = imageUrl;
+
+          if (!postDoc.exists) return;
+          let { image, name } = postDoc.data().item;
+          rentalRequest.post.image = image;
+          rentalRequest.post.title = name;
+
+          return rentalRequest;
+        })
+      );
+    })
+    .then((data) => {
+      return res.json(data);
+    })
+    .catch((err) => {
+      res.status(500).json({ error: "something went wrong" });
+      console.error(err);
+    });
+};
+
+// fetch rental activities (approval: 'approved')
+exports.getRentalActivities = (req, res) => {
+  // return response only
+
+  db.collection("rentalActivities")
+    .where("approval", "==", "approved")
+    .orderBy("createdAt", "desc")
+    .get()
+    .then((data) => {
+      const rentalRequests = [];
+      let todayDate = new Date();
+      data.forEach((doc) => {
+        // (remove if endDate have passed)
+        let requestEndDate = new Date(doc.data().endDate);
+        requestEndDate.setDate(requestEndDate.getDate() + 7);
+        if (
+          requestEndDate.setHours(0, 0, 0, 0) < todayDate.setHours(0, 0, 0, 0)
+        ) {
+          // endDate have passed a week
+          db.doc(`/rentalActivities/${doc.id}`).delete();
+          return;
+        }
+
+        if (doc.data().renter === req.user.handle) {
+          rentalRequests.push({
+            activityId: doc.id,
+            amRenter: true,
+            post: { postId: doc.data().postId },
+            user: { handle: doc.data().owner },
+            startDate: doc.data().startDate,
+            endDate: doc.data().endDate,
+            totalCost: doc.data().totalCost,
+            createdAt: doc.data().createdAt,
+          });
+        } else if (doc.data().owner === req.user.handle) {
+          rentalRequests.push({
+            activityId: doc.id,
+            amRenter: false,
+            post: { postId: doc.data().postId },
+            user: { handle: doc.data().renter },
+            startDate: doc.data().startDate,
+            endDate: doc.data().endDate,
+            totalCost: doc.data().totalCost,
+            createdAt: doc.data().createdAt,
+          });
+        }
+      });
+
+      return Promise.all(
+        rentalRequests.map(async (rentalRequest) => {
+          let userDoc = await db
+            .doc(`/users/${rentalRequest.user.handle}`)
+            .get();
+          let postDoc = await db
+            .doc(`/posts/${rentalRequest.post.postId}`)
+            .get();
+
+          let { fullName, imageUrl } = userDoc.data();
+          rentalRequest.user.fullName = fullName;
+          rentalRequest.user.imageUri = imageUrl;
+
+          if (!postDoc.exists) return;
+
+          let { image, name } = postDoc.data().item;
+          rentalRequest.post.image = image;
+          rentalRequest.post.title = name;
+
+          return rentalRequest;
+        })
+      );
+    })
+    .then((data) => {
+      return res.json(data);
+    })
+    .catch((err) => {
+      res.status(500).json({ error: "something went wrong" });
+      console.error(err);
+    });
+};
+
+// approve rental request
+exports.approveRentalRequest = (req, res) => {
+  const requestDoc = db
+    .collection("rentalActivities")
+    .doc(req.params.requestId);
+
+  requestDoc
+    .get()
+    .then((doc) => {
+      if (!doc.exists)
+        throw res.status(404).json({ error: "Request not found" });
+
+      if (doc.data().owner !== req.user.handle)
+        throw res.status(403).json({ error: "Unauthorized access" });
+
+      if (doc.data().approval === "approved")
+        throw res.status(400).json({ error: "Request already approved" });
+
+      return requestDoc.update({ approval: "approved" });
+    })
+    .then(() => {
+      return res.json({});
+    })
+    .catch((err) => {
+      //console.error(err);
+      return err;
+    });
+};
+
+// reject/delete rental request
+exports.removeRentalRequest = (req, res) => {
+  const requestDoc = db
+    .collection("rentalActivities")
+    .doc(req.params.requestId);
+
+  requestDoc
+    .get()
+    .then((doc) => {
+      if (!doc.exists)
+        throw res.status(404).json({ error: "Request not found" });
+
+      if (doc.data().approval === "approved")
+        throw res
+          .status(400)
+          .json({ error: "Cant reject/delete an approved request" });
+
+      if (
+        doc.data().owner !== req.user.handle &&
+        doc.data().renter !== req.user.handle
+      )
+        throw res.status(403).json({ error: "Unauthorized access" });
+
+      return requestDoc.delete();
+    })
+    .then(() => {
+      return res.json({});
     })
     .catch((err) => {
       //console.error(err);
