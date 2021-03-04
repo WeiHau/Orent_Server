@@ -124,35 +124,59 @@ exports.login = (req, res) => {
 
 // Add user details
 exports.updateUserDetails = (req, res) => {
-  let { userDetails, errors, valid } = reduceUserDetails(req.body);
+  const updateDetails = () => {
+    let { userDetails, errors, valid } = reduceUserDetails(req.body);
 
-  if (!valid) return res.status(400).json(errors);
+    if (!valid) return res.status(400).json(errors);
 
-  userDetails.contact.email = req.user.email;
+    userDetails.contact.email = req.user.email;
 
-  db.doc(`/users/${req.user.handle}`)
-    .update(userDetails)
-    .then(() => {
-      // update the user's post/item addresses
-      return db
-        .collection("posts")
-        .where("userHandle", "==", req.user.handle)
-        .get();
-    })
+    db.doc(`/users/${req.user.handle}`)
+      .update(userDetails)
+      .then(() => {
+        // update the user's post/item addresses
+        return db
+          .collection("posts")
+          .where("userHandle", "==", req.user.handle)
+          .get();
+      })
+      .then((data) => {
+        const promises = [];
+        data.forEach((doc) => {
+          promises.push(doc.ref.update({ location: userDetails.location }));
+        });
+
+        return Promise.all(promises);
+      })
+      .then(() => {
+        return res.json({ message: "Details updated successfully" });
+      })
+      .catch((err) => {
+        console.error(err);
+        return res.status(500).json({ error: err.code });
+      });
+  };
+
+  db.collection("rentalActivities")
+    .get()
     .then((data) => {
-      const promises = [];
+      let editable = true;
       data.forEach((doc) => {
-        promises.push(doc.ref.update({ location: userDetails.location }));
+        if (
+          doc.data().owner === req.user.handle ||
+          doc.data().renter === req.user.handle
+        ) {
+          editable = false;
+        }
       });
 
-      return Promise.all(promises);
-    })
-    .then(() => {
-      return res.json({ message: "Details updated successfully" });
-    })
-    .catch((err) => {
-      console.error(err);
-      return res.status(500).json({ error: err.code });
+      if (!editable) {
+        return res.status(400).json({
+          action: "uneditable",
+        });
+      } else {
+        updateDetails();
+      }
     });
 };
 
