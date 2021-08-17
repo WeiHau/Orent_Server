@@ -52,7 +52,7 @@ module.exports = (req, res, next) => {
         .get();
     })
     .then((data) => {
-      // the docoded token does not have the userHandle, thus it is be added here
+      // the docoded token does not have the userHandle, thus it is added here
       // getting the userHandle from the firestore(db/database)
       req.user.handle = data.docs[0].data().handle;
       req.user.imageUrl = data.docs[0].data().imageUrl;

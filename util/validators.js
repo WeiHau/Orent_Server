@@ -14,7 +14,8 @@ const isHandle = (handle) => {
 };
 
 const isEmail = (email) => {
-  const regEx = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  const regEx =
+    /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
   return email.match(regEx);
 };
 
@@ -46,7 +47,7 @@ exports.validateSignupData = (data) => {
     errors.password = "Please enter a shorter password";
 
   if (data.password !== data.confirmPassword)
-    errors.confirmPassword = "Passwords doesn't match";
+    errors.confirmPassword = "Passwords don't match";
 
   return { errors, valid: Object.keys(errors).length === 0 };
 };
